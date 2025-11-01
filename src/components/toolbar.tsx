@@ -12,7 +12,6 @@ import {
   RxText,
   RxImage,
   RxLockClosed,
-  RxTrash,
 } from "react-icons/rx";
 // Assuming this path is correct for your ToolSelector
 import ToolSelector from "./toolSelector"; 

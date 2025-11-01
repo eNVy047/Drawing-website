@@ -8,12 +8,12 @@ const Navbar: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const menuRef = useRef<HTMLDivElement>(null);
 
   const shareLink = "https://xoraxi.com"; // replace dynamically
 
-  const [links, setLinks] = useState({
+  const [, setTheme] = useState<'light' | 'dark'>('light');
+  const [links] = useState({
     github: "https://github.com/eNVy047",
     discord: "https://discord.com/users/1400075627997958216?message=Hello%20I%20have%20a%20question%20about..."
   });

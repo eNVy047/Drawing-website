@@ -33,12 +33,9 @@ interface Shape {
   strokeWidth: number;
   fillColor?: string;
   image?: HTMLImageElement;
+  maintainAspect?: boolean;
 }
 
-interface TextShape extends Shape {
-  text: string;
-  fontSize: number;
-}
 
 interface BoardProps {
   tool: string;
@@ -224,6 +221,10 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent", imag
   const saveToHistory = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (canvas.width === 0 || canvas.height === 0) {
+      // Canvas not initialized with dimensions yet; skip history save
+      return;
+    }
     
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -467,9 +468,39 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent", imag
           const startY = shape.points[0].y;
           const endX = shape.points[shape.points.length - 1].x;
           const endY = shape.points[shape.points.length - 1].y;
-          const width = endX - startX;
-          const height = endY - startY;
-          ctx.drawImage(shape.image, startX, startY, width, height);
+          let width = endX - startX;
+          let height = endY - startY;
+
+          // Support dragging in any direction
+          let drawX = startX;
+          let drawY = startY;
+          if (width < 0) {
+            drawX = endX;
+            width = Math.abs(width);
+          }
+          if (height < 0) {
+            drawY = endY;
+            height = Math.abs(height);
+          }
+
+          // Maintain aspect ratio if requested (Shift key)
+          if (shape.maintainAspect && shape.image.naturalWidth && shape.image.naturalHeight) {
+            const aspect = shape.image.naturalWidth / shape.image.naturalHeight;
+            // Adjust width/height to match aspect using whichever is larger drag
+            if (width / height > aspect) {
+              // too wide, fix width
+              width = height * aspect;
+            } else {
+              // too tall, fix height
+              height = width / aspect;
+            }
+          }
+
+          // Minimum size guard
+          width = Math.max(5, width);
+          height = Math.max(5, height);
+
+          ctx.drawImage(shape.image, drawX, drawY, width, height);
         }
         break;
 
@@ -597,6 +628,10 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent", imag
       
       // Add point to current shape
       currentShape.current.points.push(canvasCoords);
+      // For image, update aspect lock flag based on Shift key during drag
+      if (currentShape.current.type === "image") {
+        currentShape.current.maintainAspect = (e as any).shiftKey === true;
+      }
       
       // Redraw from history
       if (historyStep >= 0 && historyStep < drawHistory.length) {
