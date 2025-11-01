@@ -32,6 +32,7 @@ interface Shape {
   strokeColor: string;
   strokeWidth: number;
   fillColor?: string;
+  image?: HTMLImageElement;
 }
 
 interface TextShape extends Shape {
@@ -44,9 +45,11 @@ interface BoardProps {
   strokeColor: string;
   strokeWidth: number;
   fillColor?: string;
+  imageSource?: string | File;
+  onImageConsumed?: () => void;
 }
 
-const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: BoardProps) => {
+const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent", imageSource, onImageConsumed }: BoardProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shouldDraw = useRef(false);
   const isPanning = useRef(false);
@@ -59,6 +62,8 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
   const [historyStep, setHistoryStep] = useState(-1);
   const [zoom, setZoom] = useState<number>(100); // 100% default zoom
   const [panOffset, setPanOffset] = useState<Point>({ x: 0, y: 0 });
+  const pendingImageRef = useRef<HTMLImageElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   // Clear the canvas completely
   const clearCanvas = () => {
@@ -115,6 +120,36 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
       delete window.saveCanvasAsImage;
     };
   }, []);
+
+  // Load image when imageSource prop is provided
+  useEffect(() => {
+    if (!imageSource) return;
+    const img = new Image();
+    if (typeof imageSource === "string") {
+      img.crossOrigin = "anonymous";
+    }
+    const url = typeof imageSource === "string" ? imageSource : URL.createObjectURL(imageSource);
+    objectUrlRef.current = typeof imageSource === "string" ? null : url;
+    img.onload = () => {
+      pendingImageRef.current = img;
+    };
+    img.onerror = () => {
+      console.error("Failed to load image for insertion");
+      pendingImageRef.current = null;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+      onImageConsumed && onImageConsumed();
+    };
+    img.src = url;
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [imageSource]);
 
   // Initialize canvas
   useLayoutEffect(() => {
@@ -426,6 +461,18 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
         }
         break;
 
+      case "image":
+        if (shape.points.length >= 2 && shape.image) {
+          const startX = shape.points[0].x;
+          const startY = shape.points[0].y;
+          const endX = shape.points[shape.points.length - 1].x;
+          const endY = shape.points[shape.points.length - 1].y;
+          const width = endX - startX;
+          const height = endY - startY;
+          ctx.drawImage(shape.image, startX, startY, width, height);
+        }
+        break;
+
       case "arrow":
         if (shape.points.length >= 2) {
           const startX = shape.points[0].x;
@@ -484,11 +531,25 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
       isPanning.current = true;
       lastMousePos.current = { x: e.clientX, y: e.clientY };
       canvas.style.cursor = "grabbing";
-    } else if (tool === "text") {
-      setTextOverlay({ point: canvasCoords, value: "" });
-    } else {
-      shouldDraw.current = true;
-      startPoint.current = canvasCoords;
+  } else if (tool === "text") {
+    setTextOverlay({ point: canvasCoords, value: "" });
+  } else if (tool === "image") {
+    const img = pendingImageRef.current;
+    if (!img) return;
+    shouldDraw.current = true;
+    startPoint.current = canvasCoords;
+    currentShape.current = {
+      id: uuidv4(),
+      type: "image",
+      points: [canvasCoords],
+      strokeColor,
+      strokeWidth,
+      fillColor,
+      image: img,
+    };
+  } else {
+    shouldDraw.current = true;
+    startPoint.current = canvasCoords;
       
       // Initialize current shape
       currentShape.current = {
@@ -570,6 +631,16 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
       
       // Reset current shape
       currentShape.current = null;
+
+      // Clear pending image after placement
+      if (tool === "image") {
+        pendingImageRef.current = null;
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+        onImageConsumed && onImageConsumed();
+      }
     }
   };
 

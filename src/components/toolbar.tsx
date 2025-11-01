@@ -137,15 +137,17 @@ const ImageUploaderModal: React.FC<ImageUploaderModalProps> = ({
 
 // --- UPDATED TOOLBAR COMPONENT ---
 
-interface ToolbarProps {
+export  interface ToolbarProps {
   activeTool: string;
   setActiveTool: (tool: string) => void;
   onColorChange: (color: string) => void;
   onStrokeWidthChange: (width: number) => void;
-  onFillColorChange: (color: string) => void;// New prop for clear canvas functionality
+  onFillColorChange: (color: string) => void;
+  onImageSelected: (source: string | File) => void;
+  onClearCanvas?: () => void;
 }
 
-const Toolbar = ({ activeTool, setActiveTool, onColorChange, onStrokeWidthChange, onFillColorChange }: ToolbarProps) => {
+const Toolbar = ({ activeTool, setActiveTool, onColorChange, onStrokeWidthChange, onFillColorChange, onImageSelected }: ToolbarProps) => {
   const [showSelector, setShowSelector] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false); // New state for modal
 
@@ -165,9 +167,7 @@ const Toolbar = ({ activeTool, setActiveTool, onColorChange, onStrokeWidthChange
   };
 
   const handleImageSelected = (source: string | File) => {
-      console.log("Image source received:", source);
-      // TODO: Add logic here to place the image onto the canvas 
-      // (e.g., dispatch an action, update global state, or emit a socket event)
+    onImageSelected(source);
   };
 
   return (
