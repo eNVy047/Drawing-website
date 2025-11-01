@@ -15,6 +15,7 @@ declare global {
     resetZoom?: () => void;
     currentZoom?: number;
     clearCanvas?: () => void;
+    saveCanvasAsImage?: () => void;
   }
 }
 
@@ -79,11 +80,39 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
     ctx.setTransform(currentTransform);
   };
 
-  // Expose clear function to window for testing
+  // Save canvas as image
+  const saveCanvasAsImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    try {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      
+      // Set the download attribute and file name
+      link.download = `drawing-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+      
+      // Convert canvas to data URL
+      link.href = canvas.toDataURL('image/png');
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('Canvas saved as image');
+    } catch (error) {
+      console.error('Error saving canvas:', error);
+    }
+  };
+
+  // Expose clear and save functions to window for testing
   useEffect(() => {
     window.clearCanvas = clearCanvas;
+    window.saveCanvasAsImage = saveCanvasAsImage;
     return () => {
       delete window.clearCanvas;
+      delete window.saveCanvasAsImage;
     };
   }, []);
 
@@ -103,6 +132,19 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
       ctx.lineJoin = "round";
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = strokeWidth;
+      
+      // Load auto-saved drawing if available
+      const savedDrawing = localStorage.getItem('autoSavedDrawing');
+      if (savedDrawing) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+          // Save the loaded drawing to history
+          saveToHistory();
+          console.log('Auto-saved drawing loaded');
+        };
+        img.src = savedDrawing;
+      }
     }
 
     // Handle window resize
@@ -143,7 +185,7 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
     }
   }, [strokeColor, strokeWidth]);
 
-  // Save current canvas state to history
+  // Save current canvas state to history and auto-save
   const saveToHistory = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -169,6 +211,16 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
     
     setDrawHistory(newHistory);
     setHistoryStep(newHistory.length - 1);
+    
+    // Auto-save the canvas to local storage
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      localStorage.setItem('autoSavedDrawing', dataUrl);
+      localStorage.setItem('autoSaveTimestamp', new Date().toISOString());
+      console.log('Canvas auto-saved');
+    } catch (error) {
+      console.error('Error auto-saving canvas:', error);
+    }
   };
 
   // Handle undo action
@@ -441,7 +493,8 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent" }: Bo
       // Initialize current shape
       currentShape.current = {
         id: uuidv4(),
-        type: tool === "eraser" ? "eraser" : tool,
+        // Map "box" tool to "rectangle" type for drawing
+        type: tool === "eraser" ? "eraser" : tool === "box" ? "rectangle" : tool,
         points: [canvasCoords],
         strokeColor,
         strokeWidth,
