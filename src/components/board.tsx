@@ -390,6 +390,7 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent", imag
     };
   };
 
+
   // Draw a shape on the canvas
   const drawShape = (shape: Shape) => {
     const ctx = canvasRef.current?.getContext("2d");
