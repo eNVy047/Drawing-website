@@ -26,13 +26,21 @@ const Navbar: React.FC = () => {
   };
   
   const clearCanvas = () => {
-    const canvas = document.querySelector('canvas');
-    if (canvas) {
-      const context = canvas.getContext('2d');
-      context?.clearRect(0, 0, canvas.width, canvas.height);
+    // Use Board's reset implementation so history and autosave are cleared too
+    if (window.clearCanvas) {
+      window.clearCanvas();
+    } else {
+      // Fallback: basic clear
+      const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+      const ctx = canvas?.getContext('2d');
+      if (canvas && ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
     }
     setMenuOpen(false);
   };
+
 
 
   const toggleTheme = (newTheme: 'light' | 'dark') => {

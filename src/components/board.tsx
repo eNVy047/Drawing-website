@@ -62,22 +62,38 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent", imag
   const pendingImageRef = useRef<HTMLImageElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
 
-  // Clear the canvas completely
+  // Clear the canvas completely and reset history/autosave
   const clearCanvas = () => {
-    const ctx = canvasRef.current?.getContext("2d");
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    
-    // Save the current transform
+
+    // Save current transform and reset for full clear
     const currentTransform = ctx.getTransform();
-    
-    // Reset canvas with current dimensions
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
-    
-    // Reset history
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Reset history so no previous frames re-render
     setDrawHistory([]);
-    setHistoryStep(0);
-    
+    setHistoryStep(-1);
+
+    // Clear transient UI/data
+    setTextOverlay(null);
+    pendingImageRef.current = null;
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+
+    // Clear autosave
+    try {
+      localStorage.removeItem('autoSavedDrawing');
+      localStorage.removeItem('autoSaveTimestamp');
+    } catch (err) {
+      console.warn('Failed to clear autosave from storage', err);
+    }
+
     // Restore the transform for future drawing
     ctx.setTransform(currentTransform);
   };
@@ -380,7 +396,10 @@ const Board = ({ tool, strokeColor, strokeWidth, fillColor = "transparent", imag
     if (!ctx || !shape.points.length) return;
 
     ctx.save();
-    
+    // Apply current zoom and pan transforms so drawing respects view
+    const zoomFactor = zoom / 100;
+    ctx.setTransform(zoomFactor, 0, 0, zoomFactor, panOffset.x, panOffset.y);
+
     // Set drawing styles
     ctx.strokeStyle = shape.strokeColor;
     ctx.lineWidth = shape.strokeWidth;
